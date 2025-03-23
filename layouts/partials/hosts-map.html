@@ -3,9 +3,13 @@
 {{ $blueMarker := resources.Get "images/marker_logo_blue.png" }}
 {{ $redMarker := resources.Get "images/marker_logo_red.png" }}
 
+{{/* Process the images */}}
+{{ $blueMarker = $blueMarker | fingerprint }}
+{{ $redMarker = $redMarker | fingerprint }}
+
 <div class="hosts-map" data-width="{{ $width }}" data-height="{{ $height }}" 
-    data-blue-marker="{{ $blueMarker.Permalink }}"
-    data-red-marker="{{ $redMarker.Permalink }}">
+    data-blue-marker="{{ $blueMarker.RelPermalink }}"
+    data-red-marker="{{ $redMarker.RelPermalink }}">
     <div id="map"></div>
 </div>
 
