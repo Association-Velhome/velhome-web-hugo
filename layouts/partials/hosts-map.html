@@ -1,0 +1,136 @@
+{{ $width := .width | default "100%" }}
+{{ $height := .height | default "400px" }}
+{{ $blueMarker := resources.Get "images/marker_logo_blue.png" }}
+{{ $redMarker := resources.Get "images/marker_logo_red.png" }}
+
+<div class="hosts-map" data-width="{{ $width }}" data-height="{{ $height }}" 
+    data-blue-marker="{{ $blueMarker.Permalink }}"
+    data-red-marker="{{ $redMarker.Permalink }}">
+    <div id="map"></div>
+</div>
+
+<!-- Include Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+
+<!-- Include Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<style>
+.hosts-map {
+    width: var(--map-width);
+    height: var(--map-height);
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Firebase
+    const firebaseConfig = {
+        projectId: 'velhome-4bd75',
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const mapContainer = document.querySelector('.hosts-map');
+    mapContainer.style.setProperty('--map-width', mapContainer.dataset.width);
+    mapContainer.style.setProperty('--map-height', mapContainer.dataset.height);
+    
+    // Get marker URLs from data attributes
+    const blueMarkerUrl = mapContainer.dataset.blueMarker;
+    const redMarkerUrl = mapContainer.dataset.redMarker;
+    
+    // Initialize the map
+    const map = L.map('map').setView([47.12721778632037, 2.420270021014697], 5.4);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Function to create a custom marker
+    function createMarker(proposal) {
+        const markerIcon = L.icon({
+            iconUrl: proposal.isPro ? redMarkerUrl : blueMarkerUrl,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+            popupAnchor: [0, -30]
+        });
+
+        const marker = L.marker([proposal.location.latitude, proposal.location.longitude], {
+            icon: markerIcon
+        });
+
+        marker.on('click', () => {
+            // Dispatch a custom event when marker is clicked
+            const event = new CustomEvent('markerSelected', {
+                detail: { proposalId: proposal.id }
+            });
+            document.dispatchEvent(event);
+        });
+
+        return marker;
+    }
+
+    // Function to fetch and display markers from Firestore
+    function loadMarkersFromFirestore() {
+        db.collection('proposals').get().then((querySnapshot) => {
+            const proposals = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                proposals.push({
+                    id: doc.id,
+                    location: {
+                        latitude: data.location.latitude,
+                        longitude: data.location.longitude
+                    },
+                    isPro: data.isPro || false
+                });
+            });
+            window.updateHostsMapMarkers(proposals);
+        }).catch((error) => {
+            console.error("Error fetching proposals:", error);
+        });
+    }
+
+    // Load markers when the map is initialized
+    loadMarkersFromFirestore();
+
+    // Function to update markers
+    window.updateHostsMapMarkers = function(proposals) {
+        // Clear existing markers
+        map.eachLayer((layer) => {
+            if (layer instanceof L.Marker) {
+                map.removeLayer(layer);
+            }
+        });
+
+        // Add new markers
+        proposals.forEach(proposal => {
+            createMarker(proposal).addTo(map);
+        });
+    };
+
+    // Function to move camera
+    window.moveHostsMapCamera = function(latitude, longitude) {
+        map.setView([latitude, longitude], 5.4);
+    };
+});
+</script> 
